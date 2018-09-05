@@ -45,17 +45,14 @@ find kernel | cpio -H newc --create > acpi_override
 sudo cp acpi_override ${BOOT} || \
 	{ echo "ERROR: Could not copy acpi_override"; exit $?; }
 
-# check if we have initramfs and prepend our stuff
-if [ -d $(dirname "${IRFS_HOOK}") ] && [ -x $(which update-initramfs) ]; then
-	echo "[*] Adding hook to initramfs"
-	sudo bash -c "cat > ${IRFS_HOOK} <<- HOOK
-	#!/bin/sh
-	. /usr/share/initramfs-tools/hook-functions
-	prepend_earlyinitramfs /boot/acpi_override
-	HOOK"
-	sudo chmod +x ${IRFS_HOOK}
-	sudo update-initramfs -u -k all
-	echo "[*] Done!"
-else
-    echo "Done! Don't forget to update your bootloader config."
-fi
+# update grub.cfg
+echo "[*] Update grub.cfg"
+sudo sed -i 's/quiet"/quiet mem_sleep_default=deep"/' /etc/default/grub
+echo GRUB_EARLY_INITRD_LINUX_CUSTOM=acpi_override | sudo tee -a /etc/default/grub
+sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+echo "[*] Done"
+
+# patch grub boot config
+echo "[*] Patch bootloader config"
+sudo sed -i 's/initrd16 \/initramfs/initrd16 \/acpi_override \/initramfs/' /boot/grub2/grub.cfg
+echo "[*] Done! S3 should work after reboot ;)"
